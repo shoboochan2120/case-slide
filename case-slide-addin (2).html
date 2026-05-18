@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>症例発表スライド生成 AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; background: #f7f8fc; color: #1a1a2e; font-size: 13px; }
+
+  .header {
+    background: linear-gradient(135deg, #1a3a5c 0%, #0f6e9e 100%);
+    color: white; padding: 14px 16px; display: flex; align-items: center; gap: 10px;
+  }
+  .header-icon { font-size: 22px; }
+  .header h1 { font-size: 15px; font-weight: 600; }
+  .header p { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+
+  .content { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+  .section {
+    background: white; border-radius: 10px; padding: 12px;
+    border: 1px solid #e8eaf0; box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .section-title {
+    font-size: 11px; font-weight: 700; color: #0f6e9e;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 10px; display: flex; align-items: center; gap: 5px;
+  }
+
+  label { display: block; font-size: 11px; color: #666; margin-bottom: 3px; margin-top: 8px; }
+  label:first-of-type { margin-top: 0; }
+
+  input, select, textarea {
+    width: 100%; padding: 7px 9px; border: 1px solid #dde1ec;
+    border-radius: 6px; font-size: 12px; font-family: inherit;
+    background: #fafbff; color: #1a1a2e; transition: border-color 0.2s;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #0f6e9e; background: white; }
+  textarea { resize: vertical; min-height: 55px; line-height: 1.5; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .chip-group { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .chip {
+    font-size: 11px; padding: 4px 10px; border-radius: 20px;
+    border: 1px solid #dde1ec; cursor: pointer; background: #f7f8fc; color: #555;
+    transition: all 0.15s;
+  }
+  .chip.on { background: #0f6e9e; color: white; border-color: #0f6e9e; }
+
+  .api-section { background: #fffbf0; border: 1px solid #f0d080; border-radius: 10px; padding: 12px; }
+  .api-section .section-title { color: #b07800; }
+  .api-row { display: flex; gap: 6px; align-items: center; }
+  .api-row input { flex: 1; font-family: monospace; font-size: 11px; }
+  .btn-toggle-key {
+    padding: 6px 10px; font-size: 11px; border: 1px solid #dde1ec;
+    border-radius: 6px; background: white; cursor: pointer; white-space: nowrap; color: #555;
+  }
+
+  .btn-ai {
+    width: 100%; padding: 11px; background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: white; border: none; border-radius: 10px; font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: inherit; transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-ai:hover { opacity: 0.9; }
+  .btn-ai:active { transform: scale(0.98); }
+  .btn-ai:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .ai-preview {
+    display: none; background: #f5f0ff; border: 1px solid #c4b5fd;
+    border-radius: 10px; padding: 12px;
+  }
+  .ai-preview-title { font-size: 11px; font-weight: 700; color: #7c3aed; margin-bottom: 8px; }
+  .ai-field { margin-bottom: 8px; }
+  .ai-field-label { font-size: 10px; color: #888; margin-bottom: 2px; }
+  .ai-field-value {
+    font-size: 12px; color: #1a1a2e; background: white;
+    border: 1px solid #e0d7ff; border-radius: 6px; padding: 6px 8px; line-height: 1.6;
+    white-space: pre-wrap;
+  }
+  .ai-apply-btn {
+    width: 100%; padding: 9px; background: #7c3aed; color: white;
+    border: none; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: inherit; margin-top: 4px;
+  }
+  .ai-apply-btn:hover { opacity: 0.9; }
+
+  .btn-gen {
+    width: 100%; padding: 13px; background: linear-gradient(135deg, #1a3a5c, #0f6e9e);
+    color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 700;
+    cursor: pointer; font-family: inherit; transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-gen:hover { opacity: 0.92; }
+  .btn-gen:active { transform: scale(0.98); }
+  .btn-gen:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .progress-wrap { display: none; }
+  .progress-bar { height: 4px; background: #e8eaf0; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; background: #0f6e9e; width: 0%; transition: width 0.4s; border-radius: 4px; }
+  .progress-label { font-size: 11px; color: #666; margin-top: 5px; }
+
+  .success-box {
+    display: none; background: #e8f7ef; border: 1px solid #6dcc9a;
+    border-radius: 10px; padding: 12px; text-align: center;
+  }
+  .success-box .icon { font-size: 28px; }
+  .success-box p { font-size: 12px; color: #1a5c3a; margin-top: 4px; }
+  .slide-list { font-size: 11px; color: #555; margin-top: 8px; list-style: none; }
+  .slide-list li { padding: 3px 0; display: flex; align-items: center; gap: 5px; }
+  .slide-list li::before { content: "▸"; color: #0f6e9e; font-size: 10px; }
+
+  .note { font-size: 10px; color: #999; text-align: center; }
+  .error-msg {
+    font-size: 11px; color: #c0392b; padding: 7px 10px;
+    background: #fdf0ef; border-radius: 6px; border: 1px solid #f5c6c2;
+  }
+
+  .spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+    border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 5px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">🏥</div>
+  <div>
+    <h1>症例発表スライド AI</h1>
+    <p>キーワードを入力 → AIが補完 → PPTXをダウンロード</p>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- APIキー -->
+  <div class="api-section">
+    <div class="section-title">🔑 Anthropic APIキー</div>
+    <div class="api-row">
+      <input type="password" id="apiKey" placeholder="sk-ant-api03-..." />
+      <button class="btn-toggle-key" id="toggleBtn" onclick="toggleKey()">表示</button>
+    </div>
+    <div style="font-size:10px; color:#a07000; margin-top:5px;">
+      ※ キーはこのブラウザ外に送信・保存されません。
+      <a href="https://console.anthropic.com/" target="_blank" style="color:#0f6e9e;">APIキーを取得する →</a>
+    </div>
+  </div>
+
+  <!-- 患者情報 -->
+  <div class="section">
+    <div class="section-title">👤 症例情報（キーワード・断片でOK）</div>
+    <div class="row2">
+      <div>
+        <label>年齢・性別</label>
+        <input type="text" id="age" placeholder="例：65歳 男性" />
+      </div>
+      <div>
+        <label>診療科</label>
+        <select id="dept">
+          <option>内科</option>
+          <option>循環器内科</option>
+          <option>呼吸器内科</option>
+          <option>消化器内科</option>
+          <option>外科</option>
+          <option>整形外科</option>
+          <option>神経内科</option>
+          <option>救急科</option>
+          <option>小児科</option>
+          <option>その他</option>
+        </select>
+      </div>
+    </div>
+    <label>主訴</label>
+    <input type="text" id="chief" placeholder="例：発熱・咳嗽、胸痛" />
+    <label>現病歴のメモ（断片・箇条書きでOK）</label>
+    <textarea id="history" placeholder="例：2週間前から発熱、糖尿病既往、CTで肺炎像"></textarea>
+    <label>検査所見（数値の羅列でOK）</label>
+    <textarea id="findings" placeholder="例：WBC12800 CRP9.2 胸部CT右下葉浸潤影"></textarea>
+    <div class="row2">
+      <div>
+        <label>診断名</label>
+        <input type="text" id="diagnosis" placeholder="例：市中肺炎" />
+      </div>
+      <div>
+        <label>治療・転帰</label>
+        <input type="text" id="outcome" placeholder="例：抗菌薬・改善退院" />
+      </div>
+    </div>
+    <label>考察・ポイント（任意）</label>
+    <textarea id="discussion" placeholder="例：非典型的経過、鑑別が重要" style="min-height:40px"></textarea>
+  </div>
+
+  <!-- AI生成ボタン -->
+  <button class="btn-ai" id="aiBtn" onclick="aiGenerate()">
+    ✨ AIで内容を自動補完する
+  </button>
+  <div id="aiError" class="error-msg" style="display:none"></div>
+
+  <!-- AIプレビュー -->
+  <div class="ai-preview" id="aiPreview">
+    <div class="ai-preview-title">✨ AIが生成した内容をご確認ください</div>
+    <div class="ai-field"><div class="ai-field-label">現病歴</div><div class="ai-field-value" id="prev-history"></div></div>
+    <div class="ai-field"><div class="ai-field-label">検査所見</div><div class="ai-field-value" id="prev-findings"></div></div>
+    <div class="ai-field"><div class="ai-field-label">考察・ポイント</div><div class="ai-field-value" id="prev-discussion"></div></div>
+    <button class="ai-apply-btn" onclick="applyAndGenerate()">✅ この内容でPPTXを作成する</button>
+  </div>
+
+  <!-- スタイル -->
+  <div class="section">
+    <div class="section-title">🎨 スライドスタイル</div>
+    <label>カラーテーマ</label>
+    <div class="chip-group" id="theme-chips">
+      <div class="chip on" data-val="medical">医療ブルー</div>
+      <div class="chip" data-val="dark">ダークネイビー</div>
+      <div class="chip" data-val="green">クリニックグリーン</div>
+      <div class="chip" data-val="mono">モノクロ</div>
+    </div>
+    <label style="margin-top:10px">スライド構成</label>
+    <div class="chip-group" id="template-chips">
+      <div class="chip on" data-val="standard">標準（8枚）</div>
+      <div class="chip" data-val="short">簡潔（5枚）</div>
+      <div class="chip" data-val="detailed">詳細（11枚）</div>
+    </div>
+  </div>
+
+  <button class="btn-gen" id="genBtn" onclick="generate()">
+    ⚡ スライドを生成してダウンロード
+  </button>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">準備中...</div>
+  </div>
+
+  <div class="success-box" id="successBox">
+    <div class="icon">✅</div>
+    <p><strong>ダウンロード完了！</strong><br>PowerPointで開いてご確認ください</p>
+    <ul class="slide-list" id="slideList"></ul>
+  </div>
+
+  <p class="note">生成されたファイルはブラウザのダウンロードフォルダに保存されます</p>
+</div>
+
+<script>
+document.querySelectorAll('#theme-chips .chip').forEach(c => {
+  c.onclick = () => { document.querySelectorAll('#theme-chips .chip').forEach(x => x.classList.remove('on')); c.classList.add('on'); };
+});
+document.querySelectorAll('#template-chips .chip').forEach(c => {
+  c.onclick = () => { document.querySelectorAll('#template-chips .chip').forEach(x => x.classList.remove('on')); c.classList.add('on'); };
+});
+
+function getVal(id) { return document.getElementById(id).value.trim(); }
+function setVal(id, val) { document.getElementById(id).value = val; }
+function getChip(g) { return document.querySelector(`#${g} .chip.on`)?.dataset.val || ''; }
+
+function toggleKey() {
+  const inp = document.getElementById('apiKey');
+  const btn = document.getElementById('toggleBtn');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '隠す'; }
+  else { inp.type = 'password'; btn.textContent = '表示'; }
+}
+
+let aiResult = null;
+
+async function aiGenerate() {
+  const apiKey = getVal('apiKey');
+  if (!apiKey) { showError('APIキーを入力してください。'); return; }
+
+  const btn = document.getElementById('aiBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>AIが生成中...';
+  document.getElementById('aiError').style.display = 'none';
+  document.getElementById('aiPreview').style.display = 'none';
+
+  const data = {
+    age: getVal('age') || '不明',
+    dept: getVal('dept'),
+    chief: getVal('chief') || '主訴未入力',
+    history: getVal('history'),
+    findings: getVal('findings'),
+    diagnosis: getVal('diagnosis') || '診断名未入力',
+    outcome: getVal('outcome'),
+    discussion: getVal('discussion'),
+  };
+
+  const prompt = `あなたは経験豊富な医師です。以下の症例情報をもとに、学会・カンファレンス向けの症例発表スライド用テキストを生成してください。
+
+【症例情報】
+年齢・性別: ${data.age}
+診療科: ${data.dept}
+主訴: ${data.chief}
+現病歴メモ: ${data.history || '（未入力）'}
+検査所見メモ: ${data.findings || '（未入力）'}
+診断名: ${data.diagnosis}
+治療・転帰: ${data.outcome || '（未入力）'}
+考察メモ: ${data.discussion || '（未入力）'}
+
+以下のJSON形式のみで返答してください。マークダウン記法や前置きは不要です。JSONのみ出力してください。
+{
+  "history": "現病歴の文章（3〜5文、時系列で記述。医学的に正確な表現で）",
+  "findings": "検査所見（各項目を改行区切りで。WBC、CRP等の数値と画像所見を含む）",
+  "discussion": "考察・教育的ポイント（2〜3文。鑑別診断の要点や治療戦略の根拠を含む）"
+}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `APIエラー (${res.status})`);
+    }
+
+    const json = await res.json();
+    const text = json.content?.[0]?.text || '';
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('AIの返答を解析できませんでした。もう一度お試しください。');
+    aiResult = JSON.parse(match[0]);
+
+    document.getElementById('prev-history').textContent = aiResult.history || '';
+    document.getElementById('prev-findings').textContent = aiResult.findings || '';
+    document.getElementById('prev-discussion').textContent = aiResult.discussion || '';
+    document.getElementById('aiPreview').style.display = 'block';
+
+  } catch (e) {
+    showError('エラー: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✨ AIで内容を自動補完する';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('aiError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function applyAndGenerate() {
+  if (!aiResult) return;
+  if (aiResult.history) setVal('history', aiResult.history);
+  if (aiResult.findings) setVal('findings', aiResult.findings);
+  if (aiResult.discussion) setVal('discussion', aiResult.discussion);
+  document.getElementById('aiPreview').style.display = 'none';
+  generate();
+}
+
+// ===== PPTX生成 =====
+const THEMES = {
+  medical: { bg: '1a3a5c', accent: '0f6e9e', light: 'e8f4fd', text: '1a1a2e', white: 'FFFFFF', mid: '5ab0d4' },
+  dark:    { bg: '12192c', accent: '3d7ebf', light: '1e2d42', text: 'FFFFFF', white: 'FFFFFF', mid: '7ab3e0' },
+  green:   { bg: '1a4731', accent: '2d9e6e', light: 'e8f7ef', text: '1a2e26', white: 'FFFFFF', mid: '6dcc9a' },
+  mono:    { bg: '2c2c2c', accent: '555555', light: 'f0f0f0', text: '1a1a1a', white: 'FFFFFF', mid: '888888' },
+};
+
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+
+async function generate() {
+  const btn = document.getElementById('genBtn');
+  const pw = document.getElementById('progressWrap');
+  document.getElementById('successBox').style.display = 'none';
+
+  const age = getVal('age') || '患者情報未入力';
+  const dept = getVal('dept');
+  const chief = getVal('chief') || '主訴未入力';
+  const history = getVal('history') || '現病歴未入力';
+  const findings = getVal('findings') || '所見未入力';
+  const diagnosis = getVal('diagnosis') || '診断名未入力';
+  const outcome = getVal('outcome') || '転帰未入力';
+  const discussion = getVal('discussion') || '';
+  const T = THEMES[getChip('theme-chips')] || THEMES.medical;
+  const template = getChip('template-chips');
+
+  btn.disabled = true;
+  pw.style.display = 'block';
+  setProgress(10, 'スライド構成を準備中...');
+  await delay(150);
+
+  const pres = new PptxGenJS();
+  pres.layout = 'LAYOUT_16x9';
+  pres.title = `症例発表：${diagnosis}`;
+  const W = 10;
+
+  const bgR = (s, c, x, y, w, h) =>
+    s.addShape(pres.shapes.RECTANGLE, { x, y, w, h, fill: { color: c }, line: { color: c, width: 0 } });
+
+  const hdr = (s, title, sub) => {
+    bgR(s, T.bg, 0, 0, W, 1.0);
+    s.addText(title, { x:0.4, y:0.08, w:9.2, h:0.8, fontSize:22, bold:true, color:T.white, valign:'middle', margin:0 });
+    if (sub) { bgR(s, T.accent, 0, 1.0, W, 0.08); s.addText(sub, { x:0.4, y:1.1, w:9, h:0.35, fontSize:12, color:T.mid, margin:0 }); }
+  };
+
+  const bullets = (s, items, x, y, w, h, size=13) => {
+    s.addText(items.map((t, i) => ({ text:t, options:{ bullet:true, color:T.text, fontSize:size, breakLine: i<items.length-1 } })), { x, y, w, h, valign:'top', paraSpaceAfter:4 });
+  };
+
+  const card = (s, lbl, val, x, y, w, h) => {
+    bgR(s, T.light, x, y, w, h);
+    bgR(s, T.accent, x, y, 0.06, h);
+    s.addText(lbl, { x:x+0.1, y:y+0.05, w:w-0.15, h:0.25, fontSize:10, color:T.mid, bold:true, margin:0 });
+    s.addText(val||'—', { x:x+0.1, y:y+0.3, w:w-0.15, h:h-0.35, fontSize:12, color:T.text, margin:0, wrap:true });
+  };
+
+  setProgress(20, 'タイトルスライドを作成中...');
+  await delay(100);
+
+  // Slide 1: タイトル
+  { const s = pres.addSlide();
+    bgR(s, T.bg, 0, 0, W, 5.625); bgR(s, T.accent, 0, 0, 0.35, 5.625);
+    s.addText('症例発表', { x:0.6, y:1.2, w:9, h:0.5, fontSize:16, color:T.mid, margin:0 });
+    s.addText(diagnosis, { x:0.6, y:1.8, w:8.8, h:1.1, fontSize:34, bold:true, color:T.white, margin:0 });
+    bgR(s, T.accent, 0.6, 3.1, 3.5, 0.04);
+    s.addText(`${dept} ／ ${age}`, { x:0.6, y:3.25, w:8, h:0.4, fontSize:14, color:T.mid, margin:0 });
+    s.addText(`主訴：${chief}`, { x:0.6, y:3.75, w:8, h:0.35, fontSize:13, color:T.mid, margin:0 });
+  }
+
+  setProgress(35, '症例概要・現病歴を作成中...');
+  await delay(100);
+
+  // Slide 2: 症例概要
+  { const s = pres.addSlide(); hdr(s, '症例概要', `${dept} ／ ${age} ／ 主訴：${chief}`);
+    [['年齢・性別',age],['診療科',dept],['主訴',chief],['最終診断',diagnosis],['治療・転帰',outcome]]
+      .forEach(([l,v],i) => card(s, l, v, 0.25+(i%2)*4.75, 1.6+Math.floor(i/2)*1.05, 4.55, 0.95));
+  }
+
+  // Slide 3: 現病歴
+  { const s = pres.addSlide(); hdr(s, '現病歴', '患者背景・経過');
+    const lines = history.split(/[。\n]/).filter(l=>l.trim()).slice(0,7);
+    bullets(s, lines.length ? lines : [history], 0.4, 1.65, 9.2, 3.6);
+  }
+
+  setProgress(55, '検査所見・診断スライドを作成中...');
+  await delay(100);
+
+  // Slide 4: 検査所見
+  { const s = pres.addSlide(); hdr(s, '検査所見', '主要な検査結果');
+    const lines = findings.split(/[\n]/).filter(l=>l.trim()).slice(0,8);
+    const half = Math.ceil(lines.length/2);
+    bullets(s, lines.slice(0,half), 0.4, 1.65, 4.6, 3.7);
+    if (lines.slice(half).length) { bgR(s, T.light, 5.05, 1.55, 0.04, 3.8); bullets(s, lines.slice(half), 5.2, 1.65, 4.6, 3.7); }
+  }
+
+  // Slide 5: 診断
+  { const s = pres.addSlide(); hdr(s, '診断', '最終診断名・根拠');
+    bgR(s, T.bg, 0.4, 1.6, 9.2, 1.3);
+    s.addText(diagnosis, { x:0.5, y:1.7, w:9, h:1.1, fontSize:28, bold:true, color:T.white, align:'center', valign:'middle', margin:0 });
+    s.addText('診断の根拠', { x:0.4, y:3.15, w:9.2, h:0.35, fontSize:13, bold:true, color:T.accent, margin:0 });
+    bullets(s, findings.split(/[\n。]/).filter(l=>l.trim()).slice(0,4), 0.5, 3.55, 9, 1.8, 12);
+  }
+
+  setProgress(70, '治療・考察スライドを作成中...');
+  await delay(100);
+
+  // Slide 6: 治療
+  { const s = pres.addSlide(); hdr(s, '治療経過・転帰', '方針と結果');
+    card(s, '治療方針・処置', outcome, 0.4, 1.6, 9.2, 1.4);
+    if (template !== 'short') {
+      s.addText('経過サマリー', { x:0.4, y:3.2, w:9, h:0.35, fontSize:13, bold:true, color:T.accent, margin:0 });
+      bullets(s, ['治療開始後、経過を観察', '症状の改善を確認', outcome], 0.5, 3.6, 9, 1.8, 12);
+    }
+  }
+
+  // Slide 7: 考察
+  if (template !== 'short') {
+    const s = pres.addSlide(); hdr(s, '考察', 'Clinical Discussion');
+    const lines = (discussion||'本症例の臨床的意義について考察する。').split(/[。\n]/).filter(l=>l.trim()).slice(0,6);
+    bullets(s, lines, 0.4, 1.65, 9.2, 3.7);
+  }
+
+  setProgress(85, 'まとめスライドを作成中...');
+  await delay(100);
+
+  // Slide 8: まとめ
+  { const s = pres.addSlide(); hdr(s, 'まとめ', 'Summary');
+    bullets(s, [
+      `${age}の${chief}を主訴とした症例`,
+      `診断：${diagnosis}`,
+      `治療：${outcome}`,
+      discussion ? discussion.split(/[。\n]/)[0] : '適切な診断・治療により改善が得られた',
+      '本症例から得られた臨床的示唆',
+    ], 0.4, 1.65, 9.2, 3.7);
+  }
+
+  if (template === 'detailed') {
+    const s = pres.addSlide(); hdr(s, '参考文献', 'References');
+    bullets(s, ['関連するガイドライン・文献を記載', '例：日本○○学会 診療ガイドライン 20XX年版', '例：Author et al. Journal Name. 20XX;Vol(N):pages.'], 0.4, 1.65, 9.2, 3.7, 12);
+  }
+
+  setProgress(95, 'ファイルを出力中...');
+  await delay(200);
+
+  await pres.writeFile({ fileName: `症例発表_${diagnosis}_${new Date().toISOString().slice(0,10)}.pptx` });
+  setProgress(100, '完了！');
+  await delay(300);
+
+  btn.disabled = false;
+  pw.style.display = 'none';
+
+  const names = ['タイトル','症例概要','現病歴','検査所見','診断','治療・転帰'];
+  if (template !== 'short') names.push('考察');
+  names.push('まとめ');
+  if (template === 'detailed') names.push('参考文献');
+  document.getElementById('slideList').innerHTML = names.map(n=>`<li>${n}</li>`).join('');
+  document.getElementById('successBox').style.display = 'block';
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
