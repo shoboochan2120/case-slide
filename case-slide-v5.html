@@ -417,7 +417,7 @@ ${jsonSchema}`;
     // Multimodal: images + text
     const parts = [];
     // Add up to 5 images (API limit consideration)
-    for (const img of uploadedImages.slice(0, 5)) {
+    for (const img of uploadedImages.slice(0, 20)) {
       const [header, b64] = img.dataUrl.split(',');
       const mimeMatch = header.match(/data:([^;]+);/);
       const mediaType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
