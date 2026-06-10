@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>症例発表AI — SlideRx v5</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<style>
+:root {
+  --ink: #0d1117; --ink2: #1e2a3a; --paper: #f5f3ee;
+  --accent: #1a4a8a; --mid: #8a9ab0; --border: #ddd8d0;
+  --card: #ffffff; --red: #cc0000;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans JP', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; }
+
+/* Privacy Banner */
+.privacy-banner {
+  background: #fff8e1; border-bottom: 2px solid #f9a825;
+  padding: 10px 24px; display: flex; align-items: center; gap: 10px;
+  font-size: 12px; color: #5d4037; line-height: 1.5;
+}
+.privacy-banner .icon { font-size: 18px; flex-shrink: 0; }
+.privacy-banner strong { color: #bf360c; }
+
+/* Header */
+.header { background: var(--ink2); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+.logo { font-family: 'DM Serif Display', serif; font-size: 22px; color: white; letter-spacing: 0.5px; }
+.logo span { color: #5ab0d4; }
+.logo-sub { font-size: 10px; color: var(--mid); margin-top: 2px; }
+.ver-badge { font-size: 10px; background: #2d4a6b; color: #5ab0d4; padding: 3px 8px; border-radius: 4px; }
+
+/* Layout */
+.main { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+
+/* Cards */
+.card { background: var(--card); border-radius: 14px; border: 1px solid var(--border); padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.card-title { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.badge { background: var(--accent); color: white; font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 400; }
+
+/* Input areas */
+.paste-area, .graph-area {
+  width: 100%; padding: 14px; border: 2px dashed var(--border); border-radius: 10px;
+  font-size: 13px; font-family: 'Noto Sans JP', sans-serif; color: var(--ink);
+  background: #fafaf8; resize: vertical; line-height: 1.7; transition: border-color 0.2s;
+}
+.paste-area { min-height: 200px; }
+.graph-area { min-height: 80px; border-style: solid; }
+.paste-area:focus, .graph-area:focus { outline: none; border-color: var(--accent); background: white; border-style: solid; }
+
+/* Tabs */
+.tab-group { display: flex; gap: 0; margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.tab { flex: 1; padding: 8px; text-align: center; font-size: 12px; cursor: pointer; background: white; color: var(--mid); border-right: 1px solid var(--border); transition: all 0.15s; }
+.tab:last-child { border-right: none; }
+.tab.active { background: var(--accent); color: white; font-weight: 700; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chips */
+.chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { font-size: 12px; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); cursor: pointer; background: white; color: #555; transition: all 0.15s; }
+.chip.on { background: var(--accent); color: white; border-color: var(--accent); }
+.ex-chip { font-size: 11px; padding: 4px 10px; border-radius: 20px; background: #f0f0f8; border: 1px solid #d0d0e8; color: #555; cursor: pointer; transition: all 0.15s; }
+.ex-chip:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+label { font-size: 12px; color: var(--mid); display: block; margin-bottom: 5px; margin-top: 12px; }
+label:first-of-type { margin-top: 0; }
+
+/* File upload */
+.upload-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 20px; text-align: center; background: #fafaf8; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; }
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: #f0f7ff; }
+.upload-zone input[type="file"] { display: none; }
+.upload-icon { font-size: 28px; margin-bottom: 6px; }
+.upload-text { font-size: 13px; color: var(--mid); line-height: 1.5; }
+.upload-text strong { color: var(--accent); }
+.file-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.file-item { display: flex; align-items: center; gap: 8px; background: white; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px; }
+.file-item .file-icon { font-size: 16px; }
+.file-item .file-name { flex: 1; color: var(--ink); }
+.file-item .file-status { font-size: 11px; color: var(--mid); }
+.img-preview-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.img-preview-item { position: relative; }
+.img-preview-item img { width: 80px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+.img-preview-item .img-remove { position: absolute; top: -5px; right: -5px; background: var(--red); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+/* Buttons */
+.btn-ai { width: 100%; padding: 14px; background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.2s; margin-bottom: 10px; }
+.btn-ai:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-ai:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn-gen { width: 100%; padding: 14px; background: linear-gradient(135deg, var(--ink2), var(--accent)); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+.btn-gen:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-gen:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-apply { width: 100%; padding: 11px; background: #7c3aed; color: white; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 10px; }
+.btn-apply:hover { opacity: 0.9; }
+
+/* AI Preview */
+.ai-preview { display: none; background: #f5f0ff; border: 1px solid #c4b5fd; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.ai-preview-title { font-size: 12px; font-weight: 700; color: #7c3aed; margin-bottom: 12px; }
+.preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.preview-grid.full { grid-template-columns: 1fr; }
+.ai-field-label { font-size: 10px; color: #888; margin-bottom: 3px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.ai-field-value { font-size: 12px; color: var(--ink); background: white; border: 1px solid #e0d7ff; border-radius: 8px; padding: 8px 10px; line-height: 1.6; white-space: pre-wrap; max-height: 100px; overflow-y: auto; }
+
+/* Progress */
+.progress-wrap { display: none; margin-top: 10px; }
+.progress-bar { height: 5px; background: var(--border); border-radius: 5px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #5ab0d4); width: 0%; transition: width 0.4s; border-radius: 5px; }
+.progress-label { font-size: 11px; color: var(--mid); margin-top: 6px; }
+
+/* Success / Error */
+.success-box { display: none; background: #e8f7ef; border: 1px solid #6dcc9a; border-radius: 12px; padding: 16px; text-align: center; margin-top: 10px; }
+.success-box .icon { font-size: 32px; }
+.success-box p { font-size: 13px; color: #1a5c3a; margin-top: 6px; }
+.error-msg { font-size: 12px; color: #c0392b; padding: 8px 12px; background: #fdf0ef; border-radius: 8px; border: 1px solid #f5c6c2; margin-top: 8px; }
+
+.spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 5px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+.note { font-size: 11px; color: var(--mid); text-align: center; margin-top: 8px; }
+.hint { font-size: 11px; color: var(--mid); margin-top: 6px; line-height: 1.5; }
+
+/* Slide structure preview */
+.slide-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 8px; }
+.slide-chip { font-size: 11px; padding: 5px 8px; border-radius: 6px; background: #f0f4ff; border: 1px solid #c8d4f0; color: #1a4a8a; text-align: center; }
+.slide-chip .num { font-size: 14px; font-weight: 700; display: block; }
+</style>
+</head>
+<body>
+
+<!-- Privacy Notice -->
+<div class="privacy-banner">
+  <span class="icon">⚠️</span>
+  <div>
+    <strong>患者個人情報の取り扱いに注意してください。</strong>
+    本ツールはブラウザ上で完結し、入力データはサーバーに保存されません。ただし、AI解析のためテキスト内容がAnthropicのAPIに送信されます。
+    <strong>氏名・生年月日・住所などの直接識別情報は必ず匿名化または削除してから入力してください。</strong>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="logo">Slide<span>Rx</span></div>
+    <div class="logo-sub">症例発表スライド AI生成ツール</div>
+  </div>
+  <div class="ver-badge">v5</div>
+</div>
+
+<div class="main">
+
+  <!-- Slide Structure Preview -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">📐 スライド構成プレビュー <span id="slideCountBadge" class="badge">最大13枚</span></div>
+    <div class="slide-list" id="slidePreviewList">
+      <div class="slide-chip"><span class="num">1</span>タイトル</div>
+      <div class="slide-chip"><span class="num">2</span>症例①</div>
+      <div class="slide-chip"><span class="num">3</span>症例②</div>
+      <div class="slide-chip"><span class="num">4</span>初診時現症</div>
+      <div class="slide-chip"><span class="num">5</span>検査所見①</div>
+      <div class="slide-chip" id="chip-findings2"><span class="num">6</span>検査所見②</div>
+      <div class="slide-chip"><span class="num">7</span>臨床経過①</div>
+      <div class="slide-chip" id="chip-course2"><span class="num">8</span>臨床経過②</div>
+      <div class="slide-chip"><span class="num">9</span>考察①</div>
+      <div class="slide-chip" id="chip-disc2"><span class="num">10</span>考察②</div>
+      <div class="slide-chip" id="chip-disc3"><span class="num">11</span>考察③</div>
+      <div class="slide-chip"><span class="num">12</span>結語</div>
+      <div class="slide-chip"><span class="num">13</span>ご清聴</div>
+    </div>
+    <div style="font-size:11px;color:var(--mid);margin-top:8px;">※ 内容がない項目は自動でスキップされます。テンプレート選択でさらに調整できます。</div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="card">
+    <div class="card-title">
+      📋 STEP 1 — カルテ・資料を入力
+      <span class="badge">テキスト・PDF・画像に対応</span>
+    </div>
+    <div class="tab-group">
+      <div class="tab active" onclick="switchTab('text')">📝 テキスト入力</div>
+      <div class="tab" onclick="switchTab('pdf')">📄 PDF・文書</div>
+      <div class="tab" onclick="switchTab('image')">🖼 画像・写真</div>
+    </div>
+
+    <div class="tab-content active" id="tab-text">
+      <textarea class="paste-area" id="rawText"
+        placeholder="カルテ・退院サマリー・紹介状などをそのまま貼り付けてください（氏名・生年月日は匿名化してください）
+
+例：
+患者：50歳女性
+主訴：右眼の視力低下
+現病歴：2週間前から右眼の霧視が出現...
+既往歴：高血圧（アムロジピン5mg）
+検査：視力 右0.3 左1.0、眼圧 右18mmHg 左16mmHg
+OCT所見：黄斑部に滲出液あり..."></textarea>
+    </div>
+
+    <div class="tab-content" id="tab-pdf">
+      <div class="upload-zone" id="pdfZone" onclick="document.getElementById('pdfInput').click()"
+        ondragover="handleDragOver(event)" ondrop="handlePdfDrop(event)" ondragleave="handleDragLeave(event)">
+        <input type="file" id="pdfInput" accept=".pdf,.txt,.docx" multiple onchange="handlePdfFiles(this.files)" />
+        <div class="upload-icon">📄</div>
+        <div class="upload-text"><strong>クリックまたはドラッグ＆ドロップ</strong><br>PDF・テキストファイルをアップロード<br><span style="font-size:11px">退院サマリー・論文・紹介状など</span></div>
+      </div>
+      <div class="file-list" id="pdfFileList"></div>
+      <textarea class="paste-area" id="extractedText" placeholder="PDFから抽出されたテキストがここに表示されます。" style="margin-top:8px;min-height:100px;display:none"></textarea>
+    </div>
+
+    <div class="tab-content" id="tab-image">
+      <div class="upload-zone" id="imgZone" onclick="document.getElementById('imgInput').click()"
+        ondragover="handleDragOver(event)" ondrop="handleImgDrop(event)" ondragleave="handleDragLeave(event)">
+        <input type="file" id="imgInput" accept="image/*" multiple onchange="handleImgFiles(this.files)" />
+        <div class="upload-icon">🖼</div>
+        <div class="upload-text"><strong>クリックまたはドラッグ＆ドロップ</strong><br>CT・MRI・X線・検査表などの画像<br><span style="font-size:11px">検査所見スライドに自動で挿入されます</span></div>
+      </div>
+      <div class="img-preview-list" id="imgPreviewList"></div>
+      <div class="hint" style="margin-top:6px;">※ 画像は検査所見①・②スライドに順番に挿入されます</div>
+    </div>
+
+    <div class="hint" style="margin-top:10px;">💡 テキスト入力・PDF・画像を組み合わせて使えます</div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card">
+    <div class="card-title">📝 STEP 2 — 発表者情報・追加指示（任意）</div>
+    <textarea class="graph-area" id="graphInstructions"
+      placeholder="発表者名・所属・参考文献・特記事項などを入力してください。
+例：発表者：山田太郎（眼科）、参考文献：Author et al. NEJM 2023;100:1-5"></textarea>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+      <div class="ex-chip" onclick="addExample('考察には最新ガイドライン（20XX年版）を引用してください')">📚 ガイドライン引用</div>
+      <div class="ex-chip" onclick="addExample('時系列経過をDay表記で詳しく記述してください')">📅 Day表記</div>
+      <div class="ex-chip" onclick="addExample('鑑別診断を3〜5疾患あげてください')">🔍 鑑別診断</div>
+      <div class="ex-chip" onclick="addExample('術後経過を詳しく記述してください')">🏥 術後経過</div>
+      <div class="ex-chip" onclick="addExample('スライドを英語で作成してください')">🌐 英語</div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="card">
+    <div class="card-title">🎨 STEP 3 — スタイル・枚数設定</div>
+    <div style="font-size:12px;color:var(--mid);margin-bottom:8px;line-height:1.6;">
+      デザイン：<strong style="color:var(--ink)">白背景・シンプル・清潔感重視</strong>　／　異常値は自動で<strong style="color:var(--red)">赤字</strong>表示
+    </div>
+    <label style="margin-top:0">スライドテンプレート</label>
+    <div class="chip-group" id="template-chips">
+      <div class="chip" data-val="short" onclick="selectTemplate(this)">簡潔（〜8枚）</div>
+      <div class="chip on" data-val="standard" onclick="selectTemplate(this)">標準（〜13枚）</div>
+      <div class="chip" data-val="detailed" onclick="selectTemplate(this)">詳細（〜15枚）</div>
+    </div>
+    <div style="font-size:11px;color:var(--mid);margin-top:6px;" id="templateDesc">
+      全スライドを生成。内容のないセクションは自動スキップ。
+    </div>
+  </div>
+
+  <!-- AI Generate -->
+  <button class="btn-ai" id="aiBtn" onclick="aiGenerate()">
+    ✨ AIで内容を抽出・生成する
+  </button>
+  <div id="aiError" class="error-msg" style="display:none"></div>
+
+  <!-- AI Preview -->
+  <div class="ai-preview" id="aiPreview">
+    <div class="ai-preview-title">✨ AIが抽出・生成した内容を確認してください（内容を確認後、PPTXを作成）</div>
+    <div class="preview-grid">
+      <div><div class="ai-field-label">診断名</div><div class="ai-field-value" id="prev-diagnosis"></div></div>
+      <div><div class="ai-field-label">患者背景・主訴</div><div class="ai-field-value" id="prev-patient"></div></div>
+      <div><div class="ai-field-label">現病歴</div><div class="ai-field-value" id="prev-history"></div></div>
+      <div><div class="ai-field-label">既往歴・内服薬・アレルギー</div><div class="ai-field-value" id="prev-past"></div></div>
+      <div><div class="ai-field-label">初診時現症（バイタル・検査値）</div><div class="ai-field-value" id="prev-findings"></div></div>
+      <div><div class="ai-field-label">臨床経過</div><div class="ai-field-value" id="prev-course"></div></div>
+    </div>
+    <div class="preview-grid full">
+      <div><div class="ai-field-label">考察（概要）</div><div class="ai-field-value" id="prev-discussion"></div></div>
+      <div><div class="ai-field-label">結語</div><div class="ai-field-value" id="prev-conclusion"></div></div>
+    </div>
+    <button class="btn-apply" onclick="applyAndGenerate()">✅ この内容でPPTXを作成する（13枚）</button>
+  </div>
+
+  <hr class="divider">
+
+  <button class="btn-gen" id="genBtn" onclick="generate()">
+    ⚡ スライドを生成してダウンロード
+  </button>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">準備中...</div>
+  </div>
+
+  <div class="success-box" id="successBox">
+    <div class="icon">✅</div>
+    <p><strong>ダウンロード完了！</strong><br>PowerPointで開いてご確認ください</p>
+  </div>
+
+  <p class="note">生成されたファイルはブラウザのダウンロードフォルダに保存されます</p>
+</div>
+
+<script>
+// ===== Template selector =====
+const TEMPLATE_DESC = {
+  short:    '考察②③・検査所見②・臨床経過②を省略した簡潔版（約8〜9枚）。',
+  standard: '全スライドを生成。内容のないセクションは自動スキップ（最大13枚）。',
+  detailed: '考察・経過をさらに分割した詳細版（最大15枚）。',
+};
+function selectTemplate(el) {
+  document.querySelectorAll('#template-chips .chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('templateDesc').textContent = TEMPLATE_DESC[el.dataset.val] || '';
+  updateSlidePreview(el.dataset.val);
+}
+function getTemplate() {
+  return document.querySelector('#template-chips .chip.on')?.dataset.val || 'standard';
+}
+
+// Update the slide structure preview chips based on template
+function updateSlidePreview(tpl) {
+  const chips = {
+    'chip-findings2': tpl !== 'short',
+    'chip-course2':   tpl !== 'short',
+    'chip-disc2':     tpl !== 'short',
+    'chip-disc3':     tpl !== 'short',
+  };
+  Object.entries(chips).forEach(([id, show]) => {
+    const el = document.getElementById(id);
+    if (el) el.style.opacity = show ? '1' : '0.3';
+  });
+  const counts = {short: '〜9枚', standard: '〜13枚', detailed: '〜15枚'};
+  document.getElementById('slideCountBadge').textContent = counts[tpl] || '〜13枚';
+}
+
+// ===== UI Helpers =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+function addExample(text) {
+  const area = document.getElementById('graphInstructions');
+  area.value = area.value ? area.value + '\n' + text : text;
+  area.focus();
+}
+function getVal(id) { return document.getElementById(id).value.trim(); }
+function showError(msg) {
+  const el = document.getElementById('aiError');
+  el.textContent = msg; el.style.display = 'block';
+}
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ===== AI Generate =====
+let aiResult = null;
+
+async function aiGenerate() {
+  const rawText = getVal('rawText');
+  if (!rawText) { showError('カルテや資料を貼り付けてください。'); return; }
+
+  const btn = document.getElementById('aiBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>AIが解析中...';
+  document.getElementById('aiError').style.display = 'none';
+  document.getElementById('aiPreview').style.display = 'none';
+
+  const extra = getVal('graphInstructions');
+
+  const prompt = `あなたは経験豊富な医師です。以下の資料を解析して、症例発表スライド用データを日本語で生成してください。
+
+重要なルール：
+- 検査値の異常値・重要な数値は [赤]値[/赤] で囲んでください（例：[赤]WBC 12000[/赤]、[赤]視力 右0.05[/赤]）
+- バイタルの異常値、所見の重要な記述も同様に [赤]...[/赤] でマークしてください
+- 現病歴・臨床経過はDay表記または時系列で箇条書きにしてください
+- 各フィールドは箇条書き形式（・で始まる）で記述してください
+- 考察にはガイドラインや文献の根拠を含めてください
+
+【資料】
+${rawText}
+${extra ? `\n【追加指示・発表者情報】\n${extra}` : ''}
+
+以下のJSON形式のみで返答してください。前置きやマークダウン記法は不要です。JSONのみ出力してください。
+{
+  "diagnosis": "最終診断名（簡潔に）",
+  "presenter": "発表者名（資料にあれば。なければ空欄）",
+  "affiliation": "所属・診療科",
+  "patient": "患者背景（年齢・性別・主訴を1〜2文で）",
+  "chief_complaint": "主訴（簡潔に）",
+  "history": "現病歴（時系列で箇条書き、重要値に[赤]タグ）",
+  "past_history": "既往歴（なければ「特記なし」）",
+  "family_history": "家族歴（なければ「特記なし」）",
+  "allergies": "アレルギー（なければ「なし」）",
+  "medications": "内服薬（なければ「なし」）",
+  "vitals": "バイタルサイン・身体所見（[赤]異常値[/赤]でマーク）",
+  "lab_values": "検査値（[赤]異常値[/赤]でマーク）",
+  "findings1": "初診時検査所見①（画像所見・主要検査、重要所見に[赤]タグ）",
+  "findings2": "初診時検査所見②（追加所見・補足検査）",
+  "course1": "臨床経過①（Day表記で時系列、治療開始まで）",
+  "course2": "臨床経過②（治療後・術後・退院前後の経過）",
+  "discussion1": "考察①（疾患の概要・鑑別診断・病態）",
+  "discussion2": "考察②（治療方針・ガイドラインの根拠）",
+  "discussion3": "考察③（文献データ・統計・エビデンス）",
+  "conclusion": "結語（・で始まる箇条書き2〜3点）",
+  "references": "参考文献（各行に1件。著者名. タイトル. 雑誌名 年;巻:頁. 形式）"
+}`;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 4096
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `APIエラー (${res.status})`);
+    }
+    const json = await res.json();
+    const text = json.content?.[0]?.text || '';
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('AIの返答を解析できませんでした。もう一度お試しください。');
+    aiResult = JSON.parse(match[0]);
+
+    // Populate preview
+    document.getElementById('prev-diagnosis').textContent = aiResult.diagnosis || '';
+    document.getElementById('prev-patient').textContent =
+      [aiResult.patient, aiResult.chief_complaint ? `主訴：${aiResult.chief_complaint}` : ''].filter(Boolean).join('\n');
+    document.getElementById('prev-history').textContent = (aiResult.history || '').replace(/\[赤\]|\[\/赤\]/g, '');
+    document.getElementById('prev-past').textContent =
+      [
+        aiResult.past_history ? `既往歴：${aiResult.past_history}` : '',
+        aiResult.medications ? `内服薬：${aiResult.medications}` : '',
+        aiResult.allergies ? `アレルギー：${aiResult.allergies}` : ''
+      ].filter(Boolean).join('\n').replace(/\[赤\]|\[\/赤\]/g, '');
+    document.getElementById('prev-findings').textContent =
+      [aiResult.vitals, aiResult.lab_values].filter(Boolean).join('\n').replace(/\[赤\]|\[\/赤\]/g, '').slice(0, 300);
+    document.getElementById('prev-course').textContent =
+      [aiResult.course1, aiResult.course2].filter(Boolean).join('\n').replace(/\[赤\]|\[\/赤\]/g, '').slice(0, 300);
+    document.getElementById('prev-discussion').textContent =
+      (aiResult.discussion1 || '').replace(/\[赤\]|\[\/赤\]/g, '').slice(0, 200);
+    document.getElementById('prev-conclusion').textContent =
+      (aiResult.conclusion || '').replace(/\[赤\]|\[\/赤\]/g, '');
+
+    document.getElementById('aiPreview').style.display = 'block';
+
+  } catch(e) {
+    showError('エラー: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✨ AIで内容を抽出・生成する';
+  }
+}
+
+function applyAndGenerate() {
+  document.getElementById('aiPreview').style.display = 'none';
+  generate();
+}
+
+// ===== PPTX Generation =====
+async function generate() {
+  if (!aiResult) { showError('まず「AIで内容を抽出・生成する」を押してください。'); return; }
+
+  const btn = document.getElementById('genBtn');
+  const pw = document.getElementById('progressWrap');
+  document.getElementById('successBox').style.display = 'none';
+  document.getElementById('aiError').style.display = 'none';
+  btn.disabled = true;
+  pw.style.display = 'block';
+
+  const d = aiResult;
+  const tpl = getTemplate(); // 'short' | 'standard' | 'detailed'
+
+  // Helper: should this optional slide be included?
+  const include = (field, requiredTpl) => {
+    // Always include if content exists AND template allows
+    const hasContent = d[field] && d[field].trim();
+    if (tpl === 'short' && requiredTpl === 'standard') return false;
+    return hasContent; // skip entirely if no content
+  };
+
+  const pres = new PptxGenJS();
+  pres.layout = 'LAYOUT_16x9';
+  pres.title = d.diagnosis || '症例発表';
+
+  // Design constants (white/clean style matching reference)
+  const C = {
+    navy:   '1a2e5a',   // slide title color
+    black:  '1a1a1a',   // body text
+    red:    'CC0000',   // emphasis / abnormal values
+    gray:   '888888',   // secondary text
+    lgray:  'f2f2f2',   // light background for columns
+    border: 'cccccc',   // box borders
+    white:  'FFFFFF',
+    line:   '1a2e5a',   // accent line color
+  };
+  const FF = 'Meiryo'; // font face (Japanese Gothic)
+
+  // --- Helpers ---
+
+  // Parse [赤]...[/赤] into pptxgenjs text run array
+  function parseRed(text, size, baseColor) {
+    const col = baseColor || C.black;
+    if (!text) return [{text: '', options: {fontSize: size, color: col, fontFace: FF}}];
+    const result = [];
+    const re = /\[赤\]([\s\S]*?)\[\/赤\]/g;
+    let last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) result.push({text: text.slice(last, m.index), options: {color: col, fontSize: size, fontFace: FF}});
+      result.push({text: m[1], options: {color: C.red, bold: true, fontSize: size, fontFace: FF}});
+      last = re.lastIndex;
+    }
+    if (last < text.length) result.push({text: text.slice(last), options: {color: col, fontSize: size, fontFace: FF}});
+    return result.length ? result : [{text, options: {color: col, fontSize: size, fontFace: FF}}];
+  }
+
+  // Standard slide header: large bold title top-left + thin line
+  function addHeader(s, title) {
+    s.addText(title, {
+      x: 0.38, y: 0.15, w: 9.24, h: 0.58,
+      fontSize: 22, bold: true, color: C.navy, fontFace: FF, valign: 'bottom'
+    });
+    s.addShape(pres.shapes.RECTANGLE, {
+      x: 0.38, y: 0.70, w: 9.24, h: 0.038,
+      fill: {color: C.line}, line: {width: 0, color: C.line}
+    });
+  }
+
+  // Convert text to bullet lines, strip existing bullet chars
+  function toLines(text) {
+    if (!text) return [];
+    return text.split(/\n/).map(l => l.trim()).filter(l => l)
+      .map(l => l.replace(/^[・•●◆▶＞\-－＊\*]\s*/, ''));
+  }
+
+  // Build pptxgenjs text run array from bullet lines with red markup
+  function buildBulletRuns(text, size) {
+    const lines = toLines(text);
+    if (!lines.length) return null;
+    const arr = [];
+    lines.forEach((line, li) => {
+      const runs = parseRed('・ ' + line, size);
+      runs.forEach((run, ri) => {
+        const isLast = ri === runs.length - 1;
+        const notLastLine = li < lines.length - 1;
+        if (isLast && notLastLine) {
+          arr.push({...run, options: {...run.options, breakLine: true}});
+        } else {
+          arr.push(run);
+        }
+      });
+    });
+    return arr;
+  }
+
+  // Add bullet text to slide
+  function addBullets(s, text, x, y, w, h, size) {
+    const sz = size || 13;
+    if (!text || !text.trim()) return;
+    const runs = buildBulletRuns(text, sz);
+    if (!runs) return;
+    s.addText(runs, {x, y, w, h, valign: 'top', wrap: true, paraSpaceAfter: 5, lineSpacingMultiple: 1.35});
+  }
+
+  // Add plain body text with red markup
+  function addBody(s, text, x, y, w, h, size) {
+    const sz = size || 13;
+    if (!text || !text.trim()) return;
+    const runs = parseRed(text, sz);
+    s.addText(runs, {x, y, w, h, valign: 'top', wrap: true, paraSpaceAfter: 4, lineSpacingMultiple: 1.35});
+  }
+
+  // Add image or placeholder box (right column)
+  function addImgOrBox(s, imgData, x, y, w, h) {
+    if (imgData) {
+      try {
+        s.addImage({data: imgData, x, y, w, h, sizing: {type: 'contain', w, h}});
+        return;
+      } catch(e) { /* fall through to placeholder */ }
+    }
+    s.addShape(pres.shapes.RECTANGLE, {
+      x, y, w, h, fill: {color: 'f8f8f8'}, line: {color: C.border, width: 1.0, dashType: 'dash'}
+    });
+    s.addText('画像・図表挿入エリア', {
+      x, y: y + h/2 - 0.2, w, h: 0.4,
+      fontSize: 11, color: C.gray, fontFace: FF, align: 'center'
+    });
+  }
+
+  // Add references (bottom right, small)
+  function addRef(s) {
+    if (!d.references || !d.references.trim()) return;
+    const refs = d.references.split(/\n/).filter(l => l.trim()).slice(0, 3).join('\n');
+    s.addText(refs, {
+      x: 4.0, y: 5.1, w: 5.75, h: 0.42,
+      fontSize: 8, color: C.gray, fontFace: FF, valign: 'bottom', wrap: true
+    });
+  }
+
+  // Section label (bold, navy, small)
+  function addSectionLabel(s, label, x, y, w) {
+    s.addText(label, {
+      x, y, w, h: 0.32, fontSize: 12, bold: true, color: C.navy, fontFace: FF
+    });
+  }
+
+  setProgress(5, 'スライドを準備中...');
+  await delay(100);
+
+  // =====================================================
+  // Slide 1: Title
+  // =====================================================
+  {
+    const s = pres.addSlide();
+    // Main title (diagnosis)
+    s.addText(d.diagnosis || '症例発表', {
+      x: 0.9, y: 1.1, w: 8.2, h: 1.6,
+      fontSize: 30, bold: true, color: C.navy, fontFace: FF,
+      align: 'left', valign: 'middle', wrap: true
+    });
+    // Thin accent line
+    s.addShape(pres.shapes.RECTANGLE, {
+      x: 0.9, y: 2.72, w: 4.0, h: 0.04,
+      fill: {color: C.line}, line: {width: 0, color: C.line}
+    });
+    // Presenter + affiliation
+    const presLine = [d.presenter, d.affiliation].filter(Boolean).join('　');
+    if (presLine) {
+      s.addText(presLine, {
+        x: 0.9, y: 2.88, w: 8.2, h: 0.46,
+        fontSize: 15, color: C.black, fontFace: FF
+      });
+    }
+    // Date
+    const today = new Date().toLocaleDateString('ja-JP', {year:'numeric', month:'long', day:'numeric'});
+    s.addText(today, {
+      x: 0.9, y: 3.44, w: 8.2, h: 0.36,
+      fontSize: 11, color: C.gray, fontFace: FF
+    });
+  }
+
+  setProgress(13, '症例①を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 2: 症例① （患者背景・主訴・現病歴）
+  // =====================================================
+  {
+    const s = pres.addSlide();
+    addHeader(s, '症例①');
+
+    // Top bar: patient background + chief complaint
+    const bgParts = [];
+    if (d.patient) bgParts.push(`【患者背景】　${d.patient}`);
+    if (d.chief_complaint) bgParts.push(`【主訴】　${d.chief_complaint}`);
+    if (bgParts.length) {
+      s.addText(bgParts.join('\n'), {
+        x: 0.38, y: 0.82, w: 9.24, h: 0.85,
+        fontSize: 13, color: C.black, fontFace: FF, bold: false,
+        valign: 'top', wrap: true, lineSpacingMultiple: 1.4
+      });
+    }
+
+    // History
+    if (d.history) {
+      addSectionLabel(s, '【現病歴】', 0.38, 1.75, 9.24);
+      addBullets(s, d.history, 0.38, 2.08, 9.24, 3.2, 12.5);
+    }
+  }
+
+  setProgress(21, '症例②を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 3: 症例② （既往歴・家族歴・アレルギー・内服薬）
+  // =====================================================
+  {
+    const s = pres.addSlide();
+    addHeader(s, '症例②');
+
+    // Left column: 既往歴, 家族歴
+    s.addShape(pres.shapes.RECTANGLE, {
+      x: 0.35, y: 0.82, w: 4.4, h: 4.45,
+      fill: {color: 'f9f9f9'}, line: {width: 0.5, color: C.border}
+    });
+    // Right column: アレルギー, 内服薬
+    s.addShape(pres.shapes.RECTANGLE, {
+      x: 5.25, y: 0.82, w: 4.4, h: 4.45,
+      fill: {color: 'f9f9f9'}, line: {width: 0.5, color: C.border}
+    });
+
+    // Left content
+    let leftY = 0.96;
+    if (d.past_history) {
+      s.addText('【既往歴】', {x: 0.48, y: leftY, w: 4.1, h: 0.3, fontSize: 12, bold: true, color: C.navy, fontFace: FF});
+      leftY += 0.32;
+      addBullets(s, d.past_history, 0.48, leftY, 4.1, 1.6, 12);
+      leftY += 1.7;
+    }
+    if (d.family_history) {
+      s.addText('【家族歴】', {x: 0.48, y: leftY, w: 4.1, h: 0.3, fontSize: 12, bold: true, color: C.navy, fontFace: FF});
+      leftY += 0.32;
+      addBullets(s, d.family_history, 0.48, leftY, 4.1, 1.6, 12);
+    }
+
+    // Right content
+    let rightY = 0.96;
+    if (d.allergies) {
+      s.addText('【アレルギー】', {x: 5.38, y: rightY, w: 4.1, h: 0.3, fontSize: 12, bold: true, color: C.navy, fontFace: FF});
+      rightY += 0.32;
+      addBody(s, d.allergies, 5.38, rightY, 4.1, 0.9, 12);
+      rightY += 1.0;
+    }
+    if (d.medications) {
+      s.addText('【内服薬】', {x: 5.38, y: rightY, w: 4.1, h: 0.3, fontSize: 12, bold: true, color: C.navy, fontFace: FF});
+      rightY += 0.32;
+      addBullets(s, d.medications, 5.38, rightY, 4.1, 3.0, 12);
+    }
+  }
+
+  setProgress(29, '初診時現症を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 4: 初診時現症 （バイタル・身体所見・検査値）
+  // =====================================================
+  {
+    const s = pres.addSlide();
+    addHeader(s, '初診時現症');
+
+    if (d.vitals && d.lab_values) {
+      // Two columns
+      s.addText('【バイタルサイン・身体所見】', {x: 0.38, y: 0.85, w: 4.5, h: 0.32, fontSize: 12, bold: true, color: C.navy, fontFace: FF});
+      addBody(s, d.vitals, 0.38, 1.2, 4.5, 4.0, 12.5);
+      // Divider
+      s.addShape(pres.shapes.RECTANGLE, {x: 5.05, y: 0.82, w: 0.04, h: 4.5, fill: {color: C.border}, line: {width: 0, color: C.border}});
+      s.addText('【検査値】', {x: 5.22, y: 0.85, w: 4.5, h: 0.32, fontSize: 12, bold: true, color: C.navy, fontFace: FF});
+      addBody(s, d.lab_values, 5.22, 1.2, 4.5, 4.0, 12.5);
+    } else if (d.vitals || d.lab_values) {
+      const combinedText = [
+        d.vitals ? '【バイタルサイン・身体所見】\n' + d.vitals : '',
+        d.lab_values ? '【検査値】\n' + d.lab_values : ''
+      ].filter(Boolean).join('\n\n');
+      addBody(s, combinedText, 0.38, 0.86, 9.24, 4.4, 13);
+    } else if (d.findings1) {
+      addBody(s, d.findings1, 0.38, 0.86, 9.24, 4.4, 13);
+    }
+  }
+
+  setProgress(37, '初診時検査所見①を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 5: 初診時検査所見①（左：所見テキスト / 右：画像）
+  // =====================================================
+  {
+    const s = pres.addSlide();
+    addHeader(s, '初診時検査所見①');
+
+    addBullets(s, d.findings1 || '', 0.38, 0.86, 4.62, 4.0, 12.5);
+    addImgOrBox(s, uploadedImages[0]?.dataUrl, 5.12, 0.86, 4.65, 3.95);
+    addRef(s);
+  }
+
+  setProgress(44, '初診時検査所見②を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 6: 初診時検査所見② （オプション：内容ありかつ standard/detailed のみ）
+  // =====================================================
+  if (include('findings2', 'standard') || uploadedImages[1]) {
+    const s = pres.addSlide();
+    addHeader(s, '初診時検査所見②');
+    addBullets(s, d.findings2 || '', 0.38, 0.86, 4.62, 4.0, 12.5);
+    addImgOrBox(s, uploadedImages[1]?.dataUrl, 5.12, 0.86, 4.65, 3.95);
+    addRef(s);
+  }
+
+  setProgress(51, '臨床経過①を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 7: 臨床経過① （時系列・Day表記）
+  // =====================================================
+  {
+    const s = pres.addSlide();
+    addHeader(s, '臨床経過①');
+    addBullets(s, d.course1 || '', 0.38, 0.86, 9.24, 4.4, 13);
+  }
+
+  setProgress(58, '臨床経過②を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 8: 臨床経過② （オプション）
+  // =====================================================
+  if (include('course2', 'standard') || uploadedImages[2]) {
+    const s = pres.addSlide();
+    addHeader(s, '臨床経過②');
+    if (uploadedImages[2]) {
+      addBullets(s, d.course2 || '', 0.38, 0.86, 4.62, 4.0, 12.5);
+      addImgOrBox(s, uploadedImages[2].dataUrl, 5.12, 0.86, 4.65, 3.95);
+    } else {
+      addBullets(s, d.course2 || '', 0.38, 0.86, 9.24, 4.4, 13);
+    }
+  }
+
+  setProgress(64, '考察①を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 9: 考察① （疾患の概要・鑑別）
+  // =====================================================
+  {
+    const s = pres.addSlide();
+    addHeader(s, '考察①　疾患の概要・鑑別診断');
+    addBullets(s, d.discussion1 || '', 0.38, 0.86, 9.24, 4.4, 13);
+    addRef(s);
+  }
+
+  setProgress(70, '考察②を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 10: 考察② （オプション）
+  // =====================================================
+  if (include('discussion2', 'standard')) {
+    const s = pres.addSlide();
+    addHeader(s, '考察②　治療方針・ガイドライン');
+    addBullets(s, d.discussion2, 0.38, 0.86, 9.24, 4.4, 13);
+    addRef(s);
+  }
+
+  setProgress(76, '考察③を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 11: 考察③ （オプション）
+  // =====================================================
+  if (include('discussion3', 'standard')) {
+    const s = pres.addSlide();
+    addHeader(s, '考察③　文献データ・統計');
+    addBullets(s, d.discussion3, 0.38, 0.86, 9.24, 4.0, 13);
+    addRef(s);
+  }
+
+  // =====================================================
+  // Detailed mode: extra slides if content available
+  // =====================================================
+  if (tpl === 'detailed') {
+    // Extra findings slide if 3rd+ image uploaded
+    if (uploadedImages[3]) {
+      const s = pres.addSlide();
+      addHeader(s, '追加検査所見');
+      addImgOrBox(s, uploadedImages[3].dataUrl, 0.38, 0.86, 9.24, 4.4);
+      addRef(s);
+    }
+    // Extra discussion if graphInstructions has content
+    const extraInst = getVal('graphInstructions');
+    if (extraInst && extraInst.trim()) {
+      const s = pres.addSlide();
+      addHeader(s, '補足・追加考察');
+      s.addText(extraInst, {
+        x: 0.38, y: 0.86, w: 9.24, h: 4.4,
+        fontSize: 13, color: C.black, fontFace: FF, valign: 'top', wrap: true,
+        lineSpacingMultiple: 1.4
+      });
+    }
+  }
+
+  setProgress(82, '結語を作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 12: 結語
+  // =====================================================
+  {
+    const s = pres.addSlide();
+    addHeader(s, '結語');
+
+    const lines = toLines(d.conclusion || '');
+    if (lines.length) {
+      const textObjs = [];
+      lines.slice(0, 4).forEach((line, i) => {
+        if (i > 0) textObjs.push({text: '\n', options: {fontSize: 6, fontFace: FF}});
+        const runs = parseRed('・　' + line, 15);
+        runs.forEach(r => textObjs.push(r));
+      });
+      s.addText(textObjs, {x: 0.7, y: 1.3, w: 8.6, h: 3.8, valign: 'top', wrap: true, paraSpaceAfter: 10, lineSpacingMultiple: 1.5});
+    }
+  }
+
+  setProgress(90, '最終スライドを作成中...');
+  await delay(80);
+
+  // =====================================================
+  // Slide 13: ご清聴ありがとうございました
+  // =====================================================
+  {
+    const s = pres.addSlide();
+    s.addText('ご清聴ありがとうございました', {
+      x: 0.5, y: 1.85, w: 9, h: 1.3,
+      fontSize: 28, bold: true, color: C.navy, fontFace: FF,
+      align: 'center', valign: 'middle'
+    });
+    s.addShape(pres.shapes.RECTANGLE, {
+      x: 2.5, y: 3.1, w: 5, h: 0.04,
+      fill: {color: C.line}, line: {width: 0, color: C.line}
+    });
+    const presLine2 = [d.presenter, d.affiliation].filter(Boolean).join('　');
+    if (presLine2) {
+      s.addText(presLine2, {
+        x: 0.5, y: 3.28, w: 9, h: 0.4,
+        fontSize: 13, color: C.gray, fontFace: FF, align: 'center'
+      });
+    }
+  }
+
+  setProgress(97, 'ファイルを出力中...');
+  await delay(200);
+
+  const safeName = (d.diagnosis || '無題').replace(/[\\/:*?"<>|]/g, '_');
+  const dateStr = new Date().toISOString().slice
