@@ -101,7 +101,7 @@ label:first-of-type { margin-top: 0; }
 .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 .preview-grid.full { grid-template-columns: 1fr; }
 .ai-field-label { font-size: 10px; color: #888; margin-bottom: 3px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-.ai-field-value { font-size: 12px; color: var(--ink); background: white; border: 1px solid #e0d7ff; border-radius: 8px; padding: 8px 10px; line-height: 1.6; white-space: pre-wrap; max-height: 100px; overflow-y: auto; }
+.ai-field-value { font-size: 12px; color: var(--ink); background: white; border: 1px solid #e0d7ff; border-radius: 8px; padding: 8px 10px; line-height: 1.6; width: 100%; resize: vertical; min-height: 72px; font-family: inherit; }
 
 /* Progress */
 .progress-wrap { display: none; margin-top: 10px; }
@@ -262,19 +262,22 @@ OCT所見：黄斑部に滲出液あり..."></textarea>
   <!-- AI Preview -->
   <div class="ai-preview" id="aiPreview">
     <div class="ai-preview-title">✨ AIが抽出・生成した内容を確認してください（内容を確認後、PPTXを作成）</div>
+    <div style="font-size:11px;color:#7c3aed;margin-bottom:8px;">✏️ 内容を直接編集できます。異常値の赤字表示は <code style="background:#f0e8ff;padding:1px 4px;border-radius:3px">[赤]値[/赤]</code> で指定できます。</div>
     <div class="preview-grid">
-      <div><div class="ai-field-label">診断名</div><div class="ai-field-value" id="prev-diagnosis"></div></div>
-      <div><div class="ai-field-label">患者背景・主訴</div><div class="ai-field-value" id="prev-patient"></div></div>
-      <div><div class="ai-field-label">現病歴</div><div class="ai-field-value" id="prev-history"></div></div>
-      <div><div class="ai-field-label">既往歴・内服薬・アレルギー</div><div class="ai-field-value" id="prev-past"></div></div>
-      <div><div class="ai-field-label">初診時現症（バイタル・検査値）</div><div class="ai-field-value" id="prev-findings"></div></div>
-      <div><div class="ai-field-label">臨床経過</div><div class="ai-field-value" id="prev-course"></div></div>
+      <div><div class="ai-field-label">診断名</div><textarea class="ai-field-value" id="prev-diagnosis" style="min-height:44px"></textarea></div>
+      <div><div class="ai-field-label">発表者・所属</div><textarea class="ai-field-value" id="prev-presenter" style="min-height:44px"></textarea></div>
+      <div><div class="ai-field-label">患者背景・主訴</div><textarea class="ai-field-value" id="prev-patient"></textarea></div>
+      <div><div class="ai-field-label">既往歴・アレルギー・内服薬</div><textarea class="ai-field-value" id="prev-past"></textarea></div>
+      <div><div class="ai-field-label">バイタル・身体所見</div><textarea class="ai-field-value" id="prev-vitals"></textarea></div>
+      <div><div class="ai-field-label">検査値</div><textarea class="ai-field-value" id="prev-lab"></textarea></div>
+      <div><div class="ai-field-label">現病歴</div><textarea class="ai-field-value" id="prev-history" style="min-height:100px"></textarea></div>
+      <div><div class="ai-field-label">臨床経過①</div><textarea class="ai-field-value" id="prev-course" style="min-height:100px"></textarea></div>
     </div>
     <div class="preview-grid full">
-      <div><div class="ai-field-label">考察（概要）</div><div class="ai-field-value" id="prev-discussion"></div></div>
-      <div><div class="ai-field-label">結語</div><div class="ai-field-value" id="prev-conclusion"></div></div>
+      <div><div class="ai-field-label">考察①（疾患概要・鑑別）</div><textarea class="ai-field-value" id="prev-discussion" style="min-height:80px"></textarea></div>
+      <div><div class="ai-field-label">結語</div><textarea class="ai-field-value" id="prev-conclusion"></textarea></div>
     </div>
-    <button class="btn-apply" onclick="applyAndGenerate()">✅ この内容でPPTXを作成する（13枚）</button>
+    <button class="btn-apply" onclick="applyAndGenerate()">✅ この内容でPPTXを作成する</button>
   </div>
 
   <hr class="divider">
@@ -452,24 +455,24 @@ ${jsonSchema}`;
     aiResult = JSON.parse(match[0]);
 
     // Populate preview
-    document.getElementById('prev-diagnosis').textContent = aiResult.diagnosis || '';
-    document.getElementById('prev-patient').textContent =
+    // Populate editable textareas (keep [赤] markers so user can edit them)
+    document.getElementById('prev-diagnosis').value = aiResult.diagnosis || '';
+    document.getElementById('prev-presenter').value =
+      [aiResult.presenter, aiResult.affiliation].filter(Boolean).join('　');
+    document.getElementById('prev-patient').value =
       [aiResult.patient, aiResult.chief_complaint ? `主訴：${aiResult.chief_complaint}` : ''].filter(Boolean).join('\n');
-    document.getElementById('prev-history').textContent = (aiResult.history || '').replace(/\[赤\]|\[\/赤\]/g, '');
-    document.getElementById('prev-past').textContent =
+    document.getElementById('prev-vitals').value = aiResult.vitals || '';
+    document.getElementById('prev-lab').value = aiResult.lab_values || '';
+    document.getElementById('prev-history').value = aiResult.history || '';
+    document.getElementById('prev-past').value =
       [
         aiResult.past_history ? `既往歴：${aiResult.past_history}` : '',
         aiResult.medications ? `内服薬：${aiResult.medications}` : '',
         aiResult.allergies ? `アレルギー：${aiResult.allergies}` : ''
-      ].filter(Boolean).join('\n').replace(/\[赤\]|\[\/赤\]/g, '');
-    document.getElementById('prev-findings').textContent =
-      [aiResult.vitals, aiResult.lab_values].filter(Boolean).join('\n').replace(/\[赤\]|\[\/赤\]/g, '').slice(0, 300);
-    document.getElementById('prev-course').textContent =
-      [aiResult.course1, aiResult.course2].filter(Boolean).join('\n').replace(/\[赤\]|\[\/赤\]/g, '').slice(0, 300);
-    document.getElementById('prev-discussion').textContent =
-      (aiResult.discussion1 || '').replace(/\[赤\]|\[\/赤\]/g, '').slice(0, 200);
-    document.getElementById('prev-conclusion').textContent =
-      (aiResult.conclusion || '').replace(/\[赤\]|\[\/赤\]/g, '');
+      ].filter(Boolean).join('\n');
+    document.getElementById('prev-course').value = aiResult.course1 || '';
+    document.getElementById('prev-discussion').value = aiResult.discussion1 || '';
+    document.getElementById('prev-conclusion').value = aiResult.conclusion || '';
 
     document.getElementById('aiPreview').style.display = 'block';
 
@@ -482,6 +485,23 @@ ${jsonSchema}`;
 }
 
 function applyAndGenerate() {
+  // Sync textarea edits back into aiResult
+  aiResult.diagnosis    = document.getElementById('prev-diagnosis').value.trim();
+  const presLine = document.getElementById('prev-presenter').value.trim();
+  const pressParts = presLine.split(/　|\s{2,}/);
+  aiResult.presenter   = pressParts[0] || '';
+  aiResult.affiliation = pressParts.slice(1).join('　') || presLine;
+  const patLine = document.getElementById('prev-patient').value.trim();
+  const chiefMatch = patLine.match(/主訴[：:]\s*(.+)/);
+  aiResult.chief_complaint = chiefMatch ? chiefMatch[1].trim() : aiResult.chief_complaint;
+  aiResult.patient      = patLine.split('\n主訴')[0].split('\n主訴')[0].trim();
+
+  aiResult.vitals       = document.getElementById('prev-vitals').value.trim();
+  aiResult.lab_values   = document.getElementById('prev-lab').value.trim();
+  aiResult.history      = document.getElementById('prev-history').value.trim();
+  aiResult.course1      = document.getElementById('prev-course').value.trim();
+  aiResult.discussion1  = document.getElementById('prev-discussion').value.trim();
+  aiResult.conclusion   = document.getElementById('prev-conclusion').value.trim();
   document.getElementById('aiPreview').style.display = 'none';
   generate();
 }
