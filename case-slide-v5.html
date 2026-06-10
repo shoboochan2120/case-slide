@@ -357,7 +357,12 @@ let aiResult = null;
 
 async function aiGenerate() {
   const rawText = getVal('rawText');
-  if (!rawText) { showError('カルテや資料を貼り付けてください。'); return; }
+  const hasImages = uploadedImages.length > 0;
+
+  if (!rawText && !hasImages) {
+    showError('カルテ・資料のテキスト、またはPDF・画像のいずれかを入力してください。');
+    return;
+  }
 
   const btn = document.getElementById('aiBtn');
   btn.disabled = true;
@@ -367,21 +372,7 @@ async function aiGenerate() {
 
   const extra = getVal('graphInstructions');
 
-  const prompt = `あなたは経験豊富な医師です。以下の資料を解析して、症例発表スライド用データを日本語で生成してください。
-
-重要なルール：
-- 検査値の異常値・重要な数値は [赤]値[/赤] で囲んでください（例：[赤]WBC 12000[/赤]、[赤]視力 右0.05[/赤]）
-- バイタルの異常値、所見の重要な記述も同様に [赤]...[/赤] でマークしてください
-- 現病歴・臨床経過はDay表記または時系列で箇条書きにしてください
-- 各フィールドは箇条書き形式（・で始まる）で記述してください
-- 考察にはガイドラインや文献の根拠を含めてください
-
-【資料】
-${rawText}
-${extra ? `\n【追加指示・発表者情報】\n${extra}` : ''}
-
-以下のJSON形式のみで返答してください。前置きやマークダウン記法は不要です。JSONのみ出力してください。
-{
+  const jsonSchema = `{
   "diagnosis": "最終診断名（簡潔に）",
   "presenter": "発表者名（資料にあれば。なければ空欄）",
   "affiliation": "所属・診療科",
@@ -405,12 +396,48 @@ ${extra ? `\n【追加指示・発表者情報】\n${extra}` : ''}
   "references": "参考文献（各行に1件。著者名. タイトル. 雑誌名 年;巻:頁. 形式）"
 }`;
 
+  const textInstruction = `あなたは経験豊富な医師です。提供された資料・画像を解析して、症例発表スライド用データを日本語で生成してください。
+
+重要なルール：
+- 検査値の異常値・重要な数値は [赤]値[/赤] で囲んでください（例：[赤]WBC 12000[/赤]、[赤]視力 右0.05[/赤]）
+- バイタルの異常値、所見の重要な記述も同様に [赤]...[/赤] でマークしてください
+- 現病歴・臨床経過はDay表記または時系列で箇条書きにしてください
+- 各フィールドは箇条書き形式（・で始まる）で記述してください
+- 考察にはガイドラインや文献の根拠を含めてください
+- 画像のみの場合はその画像から読み取れる範囲で最大限推定して記載してください
+${rawText ? `\n【テキスト資料】\n${rawText}` : ''}
+${extra ? `\n【追加指示・発表者情報】\n${extra}` : ''}
+
+以下のJSON形式のみで返答してください。前置きやマークダウン記法は不要です。JSONのみ出力してください。
+${jsonSchema}`;
+
+  // Build message content (text + optional images)
+  let messageContent;
+  if (hasImages) {
+    // Multimodal: images + text
+    const parts = [];
+    // Add up to 5 images (API limit consideration)
+    for (const img of uploadedImages.slice(0, 5)) {
+      const [header, b64] = img.dataUrl.split(',');
+      const mimeMatch = header.match(/data:([^;]+);/);
+      const mediaType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      parts.push({
+        type: 'image',
+        source: { type: 'base64', media_type: mediaType, data: b64 }
+      });
+    }
+    parts.push({ type: 'text', text: textInstruction });
+    messageContent = parts;
+  } else {
+    messageContent = textInstruction;
+  }
+
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: messageContent }],
         max_tokens: 4096
       })
     });
