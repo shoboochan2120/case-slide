@@ -922,4 +922,90 @@ async function generate() {
   await delay(200);
 
   const safeName = (d.diagnosis || '無題').replace(/[\\/:*?"<>|]/g, '_');
-  const date
+  const dateStr = new Date().toISOString().slice(0, 10);
+  await pres.writeFile({fileName: `症例発表_${safeName}_${dateStr}.pptx`});
+
+  setProgress(100, '完了！');
+  await delay(300);
+
+  btn.disabled = false;
+  pw.style.display = 'none';
+  document.getElementById('successBox').style.display = 'block';
+}
+
+// ===== File Handling =====
+let uploadedImages = [];
+
+function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function handleDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function handlePdfDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); handlePdfFiles(e.dataTransfer.files); }
+function handleImgDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); handleImgFiles(e.dataTransfer.files); }
+
+async function handlePdfFiles(files) {
+  const list = document.getElementById('pdfFileList');
+  const extractedEl = document.getElementById('extractedText');
+  extractedEl.style.display = 'block';
+  for (const file of files) {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `<span class="file-icon">📄</span><span class="file-name">${file.name}</span><span class="file-status">読み込み中...</span>`;
+    list.appendChild(item);
+    try {
+      let text = file.type === 'application/pdf' ? await extractPdfText(file) : await file.text();
+      const prefix = `\n--- ${file.name} ---\n`;
+      extractedEl.value += prefix + text;
+      document.getElementById('rawText').value += prefix + text;
+      item.querySelector('.file-status').textContent = '✅ 完了';
+      item.querySelector('.file-status').style.color = '#2d9e6e';
+    } catch(e) {
+      item.querySelector('.file-status').textContent = '❌ 読み込みエラー';
+      item.querySelector('.file-status').style.color = '#c0392b';
+    }
+  }
+}
+
+async function extractPdfText(file) {
+  const pdfjsLib = window['pdfjs-dist/build/pdf'];
+  if (!pdfjsLib) return await file.text().catch(() => 'PDF抽出エラー。テキストタブに手動入力してください。');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument(buf).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(it => it.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+async function handleImgFiles(files) {
+  const preview = document.getElementById('imgPreviewList');
+  for (const file of files) {
+    await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataUrl = e.target.result;
+        const idx = uploadedImages.length;
+        uploadedImages.push({name: file.name, dataUrl});
+        const item = document.createElement('div');
+        item.className = 'img-preview-item';
+        item.innerHTML = `<img src="${dataUrl}" alt="${file.name}" title="${file.name}" /><div class="img-remove" onclick="removeImage(${idx}, this)">×</div>`;
+        preview.appendChild(item);
+        resolve();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+}
+
+function removeImage(idx, el) {
+  uploadedImages.splice(idx, 1);
+  el.parentElement.remove();
+  document.querySelectorAll('.img-remove').forEach((btn, i) => {
+    btn.setAttribute('onclick', `removeImage(${i}, this)`);
+  });
+}
+</script>
+</body>
+</html>
