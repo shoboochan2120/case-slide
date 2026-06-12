@@ -180,7 +180,8 @@ label:first-of-type { margin-top: 0; }
     <div class="tab-group">
       <div class="tab active" data-tab="text" onclick="switchTab('text')">📝 テキスト入力</div>
       <div class="tab" data-tab="pdf" onclick="switchTab('pdf')">📄 PDF・文書</div>
-      <div class="tab" data-tab="image" onclick="switchTab('image')">🖼 画像・写真</div>
+      <div class="tab" data-tab="image" onclick="switchTab('image')">🖼 挿入用画像</div>
+      <div class="tab" data-tab="analyze" onclick="switchTab('analyze')">🔍 解析用画像</div>
     </div>
 
     <div class="tab-content active" id="tab-text">
@@ -208,14 +209,27 @@ OCT所見：黄斑部に滲出液あり..."></textarea>
     </div>
 
     <div class="tab-content" id="tab-image">
+      <div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:8px;">🖼 スライド挿入用画像</div>
       <div class="upload-zone" id="imgZone" onclick="document.getElementById('imgInput').click()"
         ondragover="handleDragOver(event)" ondrop="handleImgDrop(event)" ondragleave="handleDragLeave(event)">
         <input type="file" id="imgInput" accept="image/*" multiple onchange="handleImgFiles(this.files)" />
         <div class="upload-icon">🖼</div>
-        <div class="upload-text"><strong>クリックまたはドラッグ＆ドロップ</strong><br>CT・MRI・X線・検査表などの画像<br><span style="font-size:11px">検査所見スライドに自動で挿入されます</span></div>
+        <div class="upload-text"><strong>クリックまたはドラッグ＆ドロップ</strong><br>CT・MRI・X線・写真など<br><span style="font-size:11px">検査所見①②スライドに順番に貼り付けられます</span></div>
       </div>
       <div class="img-preview-list" id="imgPreviewList"></div>
-      <div class="hint" style="margin-top:6px;">※ 画像は検査所見①・②スライドに順番に挿入されます</div>
+      <div class="hint" style="margin-top:6px;">※ AIによるテキスト解析も同時に行います（挿入＋解析の両方）</div>
+    </div>
+
+    <div class="tab-content" id="tab-analyze">
+      <div style="font-size:12px;color:#7c3aed;font-weight:700;margin-bottom:8px;">🔍 解析専用画像（スライドには挿入されません）</div>
+      <div class="upload-zone" id="analyzeZone" onclick="document.getElementById('analyzeInput').click()"
+        ondragover="handleDragOver(event)" ondrop="handleAnalyzeDrop(event)" ondragleave="handleDragLeave(event)">
+        <input type="file" id="analyzeInput" accept="image/*" multiple onchange="handleAnalyzeFiles(this.files)" />
+        <div class="upload-icon">🔍</div>
+        <div class="upload-text"><strong>クリックまたはドラッグ＆ドロップ</strong><br>手書きカルテ・検査表・紹介状の写真など<br><span style="font-size:11px">AIが内容を読み取り、テキストとしてスライドに反映します</span></div>
+      </div>
+      <div class="img-preview-list" id="analyzePreviewList"></div>
+      <div class="hint" style="margin-top:6px;">※ この画像はスライドには貼られません。テキスト情報の抽出のみに使用されます</div>
     </div>
 
     <div class="hint" style="margin-top:10px;">💡 テキスト入力・PDF・画像を組み合わせて使えます</div>
@@ -360,7 +374,7 @@ let aiResult = null;
 
 async function aiGenerate() {
   const rawText = getVal('rawText');
-  const hasImages = uploadedImages.length > 0;
+  const hasImages = uploadedImages.length > 0 || analyzeImages.length > 0;
 
   if (!rawText && !hasImages) {
     showError('カルテ・資料のテキスト、またはPDF・画像のいずれかを入力してください。');
@@ -416,18 +430,26 @@ ${jsonSchema}`;
 
   // Build message content (text + optional images)
   let messageContent;
-  if (hasImages) {
-    // Multimodal: images + text
+  const allImagesForAnalysis = [...analyzeImages, ...uploadedImages].slice(0, 20);
+  if (allImagesForAnalysis.length > 0) {
     const parts = [];
-    // Add up to 5 images (API limit consideration)
-    for (const img of uploadedImages.slice(0, 20)) {
-      const [header, b64] = img.dataUrl.split(',');
-      const mimeMatch = header.match(/data:([^;]+);/);
-      const mediaType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-      parts.push({
-        type: 'image',
-        source: { type: 'base64', media_type: mediaType, data: b64 }
-      });
+    // Add analysis-only images first (labeled)
+    if (analyzeImages.length > 0) {
+      parts.push({ type: 'text', text: '【以下は情報読み取り専用の画像です（スライドには挿入されません）。内容を読み取りテキストとして抽出してください。】' });
+      for (const img of analyzeImages.slice(0, 10)) {
+        const [header, b64] = img.dataUrl.split(',');
+        const mimeMatch = header.match(/data:([^;]+);/);
+        parts.push({ type: 'image', source: { type: 'base64', media_type: mimeMatch ? mimeMatch[1] : 'image/jpeg', data: b64 } });
+      }
+    }
+    // Add slide-insertion images (also analyzed)
+    if (uploadedImages.length > 0) {
+      parts.push({ type: 'text', text: '【以下はスライドに挿入される画像です（内容も参考にしてください）。】' });
+      for (const img of uploadedImages.slice(0, 10)) {
+        const [header, b64] = img.dataUrl.split(',');
+        const mimeMatch = header.match(/data:([^;]+);/);
+        parts.push({ type: 'image', source: { type: 'base64', media_type: mimeMatch ? mimeMatch[1] : 'image/jpeg', data: b64 } });
+      }
     }
     parts.push({ type: 'text', text: textInstruction });
     messageContent = parts;
@@ -981,12 +1003,43 @@ async function generate() {
 }
 
 // ===== File Handling =====
-let uploadedImages = [];
+let uploadedImages = [];   // for slide insertion
+let analyzeImages = [];    // for AI analysis only (not inserted into slides)
 
 function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
 function handleDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
 function handlePdfDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); handlePdfFiles(e.dataTransfer.files); }
 function handleImgDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); handleImgFiles(e.dataTransfer.files); }
+function handleAnalyzeDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); handleAnalyzeFiles(e.dataTransfer.files); }
+
+async function handleAnalyzeFiles(files) {
+  const preview = document.getElementById('analyzePreviewList');
+  for (const file of files) {
+    await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataUrl = e.target.result;
+        const idx = analyzeImages.length;
+        analyzeImages.push({name: file.name, dataUrl});
+        const item = document.createElement('div');
+        item.className = 'img-preview-item';
+        item.style.cssText = 'border: 2px solid #a78bfa; border-radius: 8px;';
+        item.innerHTML = `<img src="${dataUrl}" alt="${file.name}" title="${file.name}" style="border:none" /><div class="img-remove" onclick="removeAnalyzeImage(${idx}, this)" style="background:#7c3aed">×</div>`;
+        preview.appendChild(item);
+        resolve();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+}
+
+function removeAnalyzeImage(idx, el) {
+  analyzeImages.splice(idx, 1);
+  el.parentElement.remove();
+  document.querySelectorAll('#analyzePreviewList .img-remove').forEach((btn, i) => {
+    btn.setAttribute('onclick', `removeAnalyzeImage(${i}, this)`);
+  });
+}
 
 async function handlePdfFiles(files) {
   const list = document.getElementById('pdfFileList');
